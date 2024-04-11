@@ -1,26 +1,43 @@
 import streamlit as st
 import pandas as pd
-from geopy.geocoders import Nominatim
+import requests
 
-# Function to geocode address
-def geocode_address(address):
-    try:
-        geolocator = Nominatim(user_agent="geoapiExercises")
-        location = geolocator.geocode(address)
-        return location.latitude, location.longitude
-    except Exception as e:
-        return None, None
+# Function to geocode address using Bing Maps Geocoding API
+def geocode_address(address, api_key):
+    base_url = "http://dev.virtualearth.net/REST/v1/Locations"
+    params = {
+        "query": address,
+        "key": api_key
+    }
+    response = requests.get(base_url, params=params)
+    data = response.json()
+    if response.status_code == 200:
+        try:
+            resource_sets = data["resourceSets"]
+            if len(resource_sets) > 0:
+                resources = resource_sets[0]["resources"]
+                if len(resources) > 0:
+                    point = resources[0]["point"]
+                    latitude = point["coordinates"][0]
+                    longitude = point["coordinates"][1]
+                    return latitude, longitude
+        except KeyError:
+            pass
+    return None, None
 
 # Streamlit UI
 def main():
-    st.title("Geocode Addresses")
+    st.title("Geocode Addresses with Bing Maps API")
+    
+    # Get Bing Maps API key from user input
+    api_key = st.secrets["API_KEY"]
     
     # Single address input
     address_input = st.text_input("Enter an address:")
     
-    if address_input:
+    if address_input and api_key:
         st.write("Geocoding...")
-        latitude, longitude = geocode_address(address_input)
+        latitude, longitude = geocode_address(address_input, api_key)
         
         if latitude is not None and longitude is not None:
             st.write("Latitude:", latitude)
@@ -41,7 +58,7 @@ def main():
             
             # Geocode addresses
             st.write("Geocoding...")
-            df['Latitude'], df['Longitude'] = zip(*df['Address'].apply(geocode_address))
+            df['Latitude'], df['Longitude'] = zip(*df['Address'].apply(lambda x: geocode_address(x, api_key)))
             
             # Display geocoded data
             st.write("Geocoded data:")
